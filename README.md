@@ -125,6 +125,15 @@ curl -X POST http://localhost:8000/api/agent/query -H "Content-Type: application
 INSERT INTO customer_orders_jv VALUES ('{"name":"Dup","email":"alice@example.com"}'); -- fails UNIQUE
 INSERT INTO order_detail_jv VALUES ('{"status":"pending","customer":{"customerId":1},"items":[{"productId":999,"quantity":1,"unitPrice":10}]}'); -- fails FK
 ```
+FYR
+<img width="1663" height="734" alt="image" src="https://github.com/user-attachments/assets/4d947222-7a82-4d92-9576-27beb8ad765a" />
+
+Local 
+<img width="1725" height="722" alt="image" src="https://github.com/user-attachments/assets/44d78ab0-1e46-4e93-9e9d-e220605bccbe" />
+
+<img width="1328" height="600" alt="image" src="https://github.com/user-attachments/assets/33afafdd-1f66-405b-89aa-3a715cd9449e" />
+
+
 
 ### Run SQL demo
 
