@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ShopDB — JSON Duality Views Demo</title>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--accent:#38bdf8;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--muted:#94a3b8}
+*{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,sans-serif}
+body{margin:0;background:linear-gradient(180deg,#0f172a,#0b1224);color:#e2e8f0;min-height:100vh}
+header{padding:24px 20px;text-align:center;border-bottom:1px solid #1e293b}
+header h1{margin:0;font-size:1.8rem;letter-spacing:.02em}
+header p{color:var(--muted);margin:6px 0 0}
+.badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:.75rem;margin-top:8px}
+.badge.ok{background:#022c22;color:#86efac;border:1px solid #16a34a}
+.badge.fallback{background:#431407;color:#fdba74;border:1px solid #f97316}
+.layout{max-width:1200px;margin:0 auto;padding:18px;display:grid;grid-template-columns:320px 1fr;gap:16px}
+@media(max-width:900px){.layout{grid-template-columns:1fr}}
+nav.card, .panel.card{background:var(--card);border:1px solid #334155;border-radius:16px;padding:14px}
+nav button{width:100%;text-align:left;padding:10px 12px;margin:6px 0;border:1px solid #334155;background:#0f172a;color:#e2e8f0;border-radius:10px;cursor:pointer}
+nav button.active{background:var(--accent);color:#0f172a;border-color:var(--accent);font-weight:700}
+pre{background:#020617;border:1px solid #1e293b;padding:12px;border-radius:12px;overflow:auto;max-height:420px;font-size:.85em}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+input,select,textarea{background:#020617;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:8px 10px;outline:none}
+button.primary{background:var(--accent);color:#0f172a;border:none;padding:8px 14px;border-radius:8px;font-weight:700;cursor:pointer}
+button.ghost{background:transparent;border:1px solid #334155;color:#e2e8f0;padding:8px 14px;border-radius:8px;cursor:pointer}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+table{width:100%;border-collapse:collapse;font-size:.9em}
+th,td{padding:8px 10px;border-bottom:1px solid #334155;text-align:left}
+th{color:var(--muted);font-weight:600}
+.json{white-space:pre-wrap;word-break:break-word}
+.small{font-size:.82em;color:var(--muted)}
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:8px 0}
+.kpi div{background:#0f172a;border:1px solid #334155;border-radius:12px;padding:12px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>🛒 ShopDB — MySQL JSON Duality Views</h1>
+  <p>Relational = system of record &nbsp;|&nbsp; JSON Duality View = app-friendly document</p>
+  <div id="healthBadge" class="badge ok">checking…</div>
+  <div class="small" id="healthMsg" style="margin-top:6px"></div>
+</header>
+
+<div class="layout">
+  <nav class="card">
+    <div class="kpi" id="kpis"></div>
+    <button class="active" data-tab="customers">👥 Customers (customer_orders_jv)</button>
+    <button data-tab="catalog">📦 Catalog (product_catalog_jv)</button>
+    <button data-tab="orders">🧾 Orders (order_detail_jv)</button>
+    <button data-tab="create">➕ Create Customer / Order</button>
+    <button data-tab="agent">🤖 AI Agent Playground</button>
+    <button data-tab="compare">⚖️ Before vs After</button>
+    <hr style="border:0;border-top:1px solid #334155;margin:12px 0"/>
+    <div class="small">
+      <b>API base:</b> <input id="apiBase" value="http://localhost:8000" style="width:100%;margin-top:6px"/>
+      <button class="ghost" style="width:100%;margin-top:8px" onclick="checkHealth()">↻ Re-check health</button>
+    </div>
+    <div class="small" style="margin-top:12px;line-height:1.5">
+      <b>How to test (quick):</b><br/>
+      1) Customers → search / open JSON<br/>
+      2) Create → add customer & order<br/>
+      3) Orders → PATCH status<br/>
+      4) Agent → ask “show customer Alice”
+    </div>
+  </nav>
+
+  <div class="panel card" id="panel"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const api = () => $('#apiBase').value.replace(/\/$/,'');
+const jstr = o => JSON.stringify(o, null, 2);
+
+async function fetchJSON(path, opts){
+  const r = await fetch(api()+path, opts);
+  const text = await r.text();
+  let data; try{ data=JSON.parse(text);}catch{ data=text; }
+  if(!r.ok) throw new Error(typeof data==='string'?data: (data.detail||text));
+  return data;
+}
+
+async function checkHealth(){
+  try{
+    const h = await fetchJSON('/health');
+    const badge = $('#healthBadge');
+    badge.textContent = h.duality ? '✅ JSON DUALITY VIEW active (MySQL 9.1+)' : '⚠️ Fallback JSON_OBJECT view (MySQL 8)';
+    badge.className = 'badge '+(h.duality?'ok':'fallback');
+    $('#healthMsg').textContent = h.msg + ' — Duality='+h.duality;
+    const s = await fetchJSON('/api/stats');
+    $('#kpis').innerHTML = `<div><b>${s.customers}</b><br/><span class="small">customers</span></div><div><b>${s.products}</b><br/><span class="small">products</span></div><div><b>${s.orders}</b><br/><span class="small">orders</span></div>`;
+  }catch(e){
+    $('#healthBadge').textContent='❌ API unreachable';
+    $('#healthBadge').className='badge fallback';
+    $('#healthMsg').textContent=e.message;
+  }
+}
+
+function renderCustomers(){
+  $('#panel').innerHTML = `
+    <h3>👥 Customers — <span class="small">via <code>customer_orders_jv</code></span></h3>
+    <div class="controls"><input id="q" placeholder="search name/email"/><button class="primary" onclick="loadCustomers()">Search</button><button class="ghost" onclick="loadCustomers(true)">Reset</button></div>
+    <div id="out"></div>
+    <pre id="raw" class="small"></pre>
+  `;
+  loadCustomers();
+}
+async function loadCustomers(reset=false){
+  if(reset) $('#q').value='';
+  const q = $('#q')?.value || '';
+  const data = await fetchJSON('/api/customers'+(q?`?search=${encodeURIComponent(q)}`:''));
+  $('#raw').textContent = jstr(data);
+  $('#out').innerHTML = `<table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Orders</th><th>Action</th></tr></thead><tbody>`+
+    data.map(d=>{
+      const id = d._id || d.customer_id || d.customerId || '?';
+      const orders = Array.isArray(d.orders)? d.orders.length : (d.orders?'~':'0');
+      return `<tr><td>${id}</td><td>${d.name||''}</td><td>${d.email||''}</td><td>${orders}</td><td><button class="ghost" onclick="viewCust(${id})">View JSON</button> <button class="ghost" onclick="delCust(${id})">Delete</button></td></tr>`;
+    }).join('')+`</tbody></table>`;
+}
+async function viewCust(id){
+  const doc = await fetchJSON('/api/customers/'+id);
+  $('#raw').textContent = jstr(doc);
+  window.scrollTo(0,0);
+}
+async function delCust(id){
+  if(!confirm('Delete customer '+id+'? Will fail if they have orders (FK governance).')) return;
+  try{ await fetchJSON('/api/customers/'+id,{method:'DELETE'}); alert('Deleted'); loadCustomers(); checkHealth(); }catch(e){ alert(e.message); }
+}
+
+function renderCatalog(){
+  $('#panel').innerHTML = `<h3>📦 Catalog — <span class="small">via <code>product_catalog_jv</code></span></h3><div class="controls"><button class="primary" onclick="loadCatalog()">Reload</button></div><div id="out"></div><pre id="raw"></pre>`;
+  loadCatalog();
+}
+async function loadCatalog(){
+  const data = await fetchJSON('/api/catalog');
+  $('#raw').textContent = jstr(data);
+  $('#out').innerHTML = data.map(cat=>{
+    const prods = cat.products||[];
+    return `<div style="border:1px solid #334155;border-radius:12px;padding:10px;margin:8px 0;background:#0f172a"><b>${cat.categoryName||cat.category_name}</b> <span class="small">— ${cat.description||''}</span><br/><span class="small">${prods.length} products</span><div style="margin-top:8px">`+
+      prods.map(p=>`<div style="padding:6px 8px;border:1px dashed #334155;border-radius:8px;margin:4px 0">🔹 <b>${p.title}</b> — $${p.price} · stock ${p.stock}<br/><span class="small">${p.sku} · ${p.reviews? p.reviews.length+' reviews':''}</span></div>`).join('')+`</div></div>`;
+  }).join('') || '<span class="small">No categories</span>';
+}
+
+function renderOrders(){
+  $('#panel').innerHTML = `
+    <h3>🧾 Orders — <span class="small">via <code>order_detail_jv</code></span></h3>
+    <div class="controls"><button class="primary" onclick="loadOrders()">Reload</button></div>
+    <div id="out"></div>
+    <pre id="raw"></pre>
+    <div class="controls"><input id="oid" placeholder="order id" style="width:120px"/><select id="ostatus"><option>pending</option><option>paid</option><option>shipped</option><option>delivered</option><option>cancelled</option></select><button class="primary" onclick="patchOrder()">PATCH status</button></div>
+  `;
+  loadOrders();
+}
+async function loadOrders(){
+  const data = await fetchJSON('/api/orders');
+  $('#raw').textContent = jstr(data);
+  $('#out').innerHTML = `<table><thead><tr><th>Order</th><th>Customer</th><th>Status</th><th>Total</th><th>Items</th><th>View</th></tr></thead><tbody>`+
+    data.map(o=>{
+      const id = o._id||o.order_id||'?';
+      const cust = o.customer? (o.customer.name||o.customer.customerId||o.customer_id) : (o.customer_id||'');
+      const items = o.items? o.items.length : 0;
+      return `<tr><td>${id}</td><td>${cust}</td><td>${o.status}</td><td>$${o.totalAmount||o.total_amount||0}</td><td>${items}</td><td><button class="ghost" onclick="viewOrder(${id})">View</button></td></tr>`;
+    }).join('')+`</tbody></table>`;
+}
+async function viewOrder(id){ $('#raw').textContent = jstr(await fetchJSON('/api/orders/'+id)); }
+async function patchOrder(){
+  const id=$('#oid').value, status=$('#ostatus').value;
+  if(!id) return alert('Enter order id');
+  const res = await fetchJSON('/api/orders/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
+  alert('Updated'); $('#raw').textContent=jstr(res); loadOrders(); checkHealth();
+}
+
+function renderCreate(){
+  $('#panel').innerHTML = `
+    <h3>➕ Create</h3>
+    <div class="grid">
+      <div style="border:1px solid #334155;border-radius:12px;padding:12px;background:#0f172a">
+        <h4 style="margin:0 0 8px">Customer (insert via duality view)</h4>
+        <input id="cname" placeholder="Name" value="Eve Martinez" style="width:100%;margin:4px 0"/>
+        <input id="cemail" placeholder="Email" value="eve_${Date.now()}@example.com" style="width:100%;margin:4px 0"/>
+        <input id="cphone" placeholder="Phone" value="+1-415-555-0199" style="width:100%;margin:4px 0"/>
+        <input id="cstreet" placeholder="Street" value="99 Mission St" style="width:100%;margin:4px 0"/>
+        <input id="ccity" placeholder="City" value="San Francisco" style="width:100%;margin:4px 0"/>
+        <div class="controls"><button class="primary" onclick="createCust()">Create Customer</button></div>
+        <pre id="craw" style="max-height:200px"></pre>
+      </div>
+      <div style="border:1px solid #334155;border-radius:12px;padding:12px;background:#0f172a">
+        <h4 style="margin:0 0 8px">Order (insert via order_detail_jv)</h4>
+        <input id="ocust" placeholder="Customer ID" value="2" style="width:100%;margin:4px 0"/>
+        <input id="oprod" placeholder="Product ID" value="3" style="width:100%;margin:4px 0"/>
+        <input id="oqty" placeholder="Qty" value="1" style="width:100%;margin:4px 0"/>
+        <select id="ostat" style="width:100%;margin:4px 0"><option>pending</option><option>paid</option><option>shipped</option></select>
+        <div class="controls"><button class="primary" onclick="createOrder()">Create Order</button></div>
+        <pre id="oraw" style="max-height:200px"></pre>
+      </div>
+    </div>
+  `;
+}
+async function createCust(){
+  const body={name:$('#cname').value,email:$('#cemail').value,phone:$('#cphone').value,addresses:[{label:'home',street:$('#cstreet').value,city:$('#ccity').value,state:'CA',zip:'94105'}]};
+  try{ const r=await fetchJSON('/api/customers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); $('#craw').textContent=jstr(r); checkHealth(); }catch(e){ $('#craw').textContent=e.message; }
+}
+async function createOrder(){
+  const body={customer_id:parseInt($('#ocust').value),status:$('#ostat').value,items:[{productId:parseInt($('#oprod').value),quantity:parseInt($('#oqty').value)}]};
+  try{ const r=await fetchJSON('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); $('#oraw').textContent=jstr(r); checkHealth(); }catch(e){ $('#oraw').textContent=e.message; }
+}
+
+function renderAgent(){
+  $('#panel').innerHTML = `
+    <h3>🤖 AI Agent Playground — Duality Views as Tool</h3>
+    <p class="small">Agent sees ONE JSON doc per entity. No JOINs. Ask in natural language.</p>
+    <div class="controls"><input id="aq" placeholder="Try: show customer Alice / show catalog / how many orders?" style="flex:1"/><button class="primary" onclick="askAgent()">Ask</button></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+      <button class="ghost" onclick="$('#aq').value='show customer 1';askAgent()">show customer 1</button>
+      <button class="ghost" onclick="$('#aq').value='show catalog';askAgent()">show catalog</button>
+      <button class="ghost" onclick="$('#aq').value='list orders';askAgent()">list orders</button>
+      <button class="ghost" onclick="$('#aq').value='how many orders?';askAgent()">how many orders?</button>
+    </div>
+    <pre id="araw"></pre>
+    <div class="small" style="border:1px solid #334155;border-radius:10px;padding:10px;background:#020617">
+      <b>Why duality helps agents:</b> Tool <code>fetch_customer(id)</code> maps to <code>SELECT * FROM customer_orders_jv WHERE _id=?</code> → hierarchical JSON. Agent gets customer+addresses+orders+items+products in one call vs 4-5 JOINs. Relational constraints (FK, UNIQUE) still enforced.
+    </div>
+  `;
+}
+async function askAgent(){
+  const q=$('#aq').value||'show catalog';
+  const r=await fetchJSON('/api/agent/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});
+  $('#araw').textContent=jstr(r);
+}
+
+function renderCompare(){
+  $('#panel').innerHTML = `
+    <h3>⚖️ Before vs After</h3>
+    <div class="grid">
+      <div><b class="small" style="color:#f87171">BEFORE: Manual JSON in SQL (verbose)</b><pre>SELECT JSON_OBJECT(
+  'customerId', c.customer_id,
+  'name', c.name,
+  'orders', (SELECT JSON_ARRAYAGG(
+               JSON_OBJECT('orderId', o.order_id))
+             FROM orders o WHERE o.customer_id=c.customer_id)
+) FROM customers c WHERE c.customer_id=1;
+
+-- Needs JSON_ARRAYAGG + JSON_OBJECT nesting
+-- Hard to UPDATE: must write to 3 tables
+-- ORM: N+1 queries or complex includes</pre></div>
+      <div><b class="small" style="color:#4ade80">AFTER: Duality View (declarative)</b><pre>CREATE JSON DUALITY VIEW customer_orders_jv AS
+ customers AS c {
+   _id: c.customer_id @id,
+   name: c.name,
+   orders: orders AS o @nest {
+     orderId: o.order_id @id,
+     items: order_items @nest {...}
+   } WITH CONDITION o.customer_id=c.customer_id
+ };
+
+SELECT * FROM customer_orders_jv WHERE _id=1;
+INSERT INTO customer_orders_jv VALUES ('{...}');
+UPDATE customer_orders_jv SET doc=JSON_MERGE_PATCH(...)</pre></div>
+    </div>
+    <table><thead><tr><th>Aspect</th><th>JSON column</th><th>Join + JSON_OBJECT</th><th>Duality View ✅</th></tr></thead><tbody>
+      <tr><td>Governance (FK/UNIQUE)</td><td>❌ none</td><td>✅ yes</td><td>✅ yes</td></tr>
+      <tr><td>App sees JSON doc</td><td>✅</td><td>✅ (manual)</td><td>✅ (auto)</td></tr>
+      <tr><td>Updatable via JSON</td><td>✅</td><td>❌</td><td>✅ INSERT/UPDATE/DELETE</td></tr>
+      <tr><td>No duplication</td><td>❌ duplicate data</td><td>✅ normalized</td><td>✅ normalized</td></tr>
+      <tr><td>Joins in app</td><td>no</td><td>yes, manual</td><td>no, single doc</td></tr>
+    </tbody></table>
+  `;
+}
+
+document.querySelectorAll('nav button[data-tab]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('nav button[data-tab]').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  const t=b.dataset.tab;
+  if(t==='customers') renderCustomers();
+  if(t==='catalog') renderCatalog();
+  if(t==='orders') renderOrders();
+  if(t==='create') renderCreate();
+  if(t==='agent') renderAgent();
+  if(t==='compare') renderCompare();
+}));
+
+checkHealth();
+renderCustomers();
+</script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+services:
+  mysql:
+    image: mysql:9.4
+    container_name: shop_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: shop_password
+      MYSQL_DATABASE: shopdb
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./sql/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+      - ./sql/03_duality_views.sql:/docker-entrypoint-initdb.d/03_duality_views.sql:ro
+      - ./scripts/init_duality.sh:/docker-entrypoint-initdb.d/04_init_duality.sh:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-pshop_password"]
+      interval: 5s
+      retries: 20
+      start_period: 30s
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: shop_api
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: shop_password
+      MYSQL_DATABASE: shopdb
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Optional: Adminer for quick SQL inspection at http://localhost:8080
+  adminer:
+    image: adminer:4-standalone
+    container_name: shop_adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+
+volumes:
+  mysql_data:
