@@ -7,6 +7,9 @@ Bonus: works on **MySQL 9.1+ (native duality)** *and* **MySQL 8.0 (fallback JSON
 
 ---
 
+<img width="1046" height="733" alt="image" src="https://github.com/user-attachments/assets/c4c4cb34-d889-4a13-948c-75d25507ad3b" />
+
+
 ## What’s inside
 
 - `sql/01_schema.sql` — 7 normalized tables + FK/UNIQUE/CHECK + triggers (`total_amount`)
