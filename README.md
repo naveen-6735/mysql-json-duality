@@ -128,10 +128,15 @@ INSERT INTO order_detail_jv VALUES ('{"status":"pending","customer":{"customerId
 FYR
 <img width="1663" height="734" alt="image" src="https://github.com/user-attachments/assets/4d947222-7a82-4d92-9576-27beb8ad765a" />
 
-Local 
+### Local 
 <img width="1725" height="722" alt="image" src="https://github.com/user-attachments/assets/44d78ab0-1e46-4e93-9e9d-e220605bccbe" />
 
 <img width="1328" height="600" alt="image" src="https://github.com/user-attachments/assets/33afafdd-1f66-405b-89aa-3a715cd9449e" />
+
+### AI Agent Playground — Duality Views as Tool
+
+<img width="1723" height="942" alt="image" src="https://github.com/user-attachments/assets/4f9649b6-266e-4498-982e-229264579c22" />
+
 
 
 
